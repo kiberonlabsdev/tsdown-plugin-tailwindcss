@@ -35,41 +35,45 @@ export const tailwindPlugin = (options: TailwindPluginOptions = {}): Plugin => {
     async transform(src, id) {
       if (!isPotentialCssRootFile(id)) return null;
 
-      using I = new Instrumentation();
-      I.start('[@tailwindcss/tsdown] Generate CSS');
+      const I = new Instrumentation();
+      try {
+        I.start('[@tailwindcss/tsdown] Generate CSS');
 
-      let root = roots.get(id);
+        let root = roots.get(id);
 
-      let result = await root.generate(
-        src,
-        (file) => {
-          // Add file to watch list
-          this.addWatchFile?.(file);
-        },
-        I
-      );
+        let result = await root.generate(
+          src,
+          (file) => {
+            // Add file to watch list
+            this.addWatchFile?.(file);
+          },
+          I
+        );
 
-      if (!result) {
-        roots.delete(id);
-        return null;
-      }
+        if (!result) {
+          roots.delete(id);
+          return null;
+        }
 
-      I.end('[@tailwindcss/tsdown] Generate CSS');
+        I.end('[@tailwindcss/tsdown] Generate CSS');
 
-      // Optimize CSS in production
-      if (minify || process.env.NODE_ENV === 'production') {
-        I.start('[@tailwindcss/tsdown] Optimize CSS');
-        result = optimize(result.code, {
-          minify: true,
+        // Optimize CSS in production
+        if (minify || process.env.NODE_ENV === 'production') {
+          I.start('[@tailwindcss/tsdown] Optimize CSS');
+          result = optimize(result.code, {
+            minify: true,
+            map: result.map
+          });
+          I.end('[@tailwindcss/tsdown] Optimize CSS');
+        }
+
+        return {
+          code: result.code,
           map: result.map
-        });
-        I.end('[@tailwindcss/tsdown] Optimize CSS');
+        };
+      } finally {
+        I[Symbol.dispose]();
       }
-
-      return {
-        code: result.code,
-        map: result.map
-      };
     }
   };
 };
